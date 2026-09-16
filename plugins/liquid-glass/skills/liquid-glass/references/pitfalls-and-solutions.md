@@ -19,7 +19,9 @@ Known issues, workarounds, and best practices when working with Liquid Glass.
 
 **Problem:** Nearby glass elements have different visual appearances, breaking visual harmony.
 
-**Cause:** Glass cannot sample other glass. Without a shared container, each glass element creates its own sampling region.
+**Cause:** Without a shared container, each glass element is rendered independently instead of being
+merged with its neighbors. A `GlassEffectContainer` merges glass effect views that are within a specified
+proximity of each other and batches their render passes, which is what gives a group its unified look.
 
 **Solution:** Wrap all nearby glass elements in a `GlassEffectContainer`:
 
@@ -258,7 +260,10 @@ Button("Action") { }
 **Problem:** `.interactive()` glass doesn't scale/bounce on interaction.
 
 **Checklist:**
-- `.interactive()` is iOS only (not macOS)
+- `.interactive()` exists on macOS but its documented purpose is glass backing interactive **controls**
+  (AppKit: `effectIsInteractive`, `API_AVAILABLE(macos(27.0))`). On a macOS glass surface hosting only
+  static text, neither hover nor press produces a visible change. The touch- and motion-driven responses
+  are iOS-only in practice, because macOS has neither input.
 - The view must be interactive (Button, gesture attached)
 - Verify the glass modifier is applied correctly: `.glassEffect(.regular.interactive())`
 

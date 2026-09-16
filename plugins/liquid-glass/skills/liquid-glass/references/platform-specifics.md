@@ -113,6 +113,41 @@ NavigationSplitView(preferredCompactColumn: $preferredColumn) {
 
 ### macOS-Specific Considerations
 
+**Don't bridge `NSGlassEffectView` as a bare `.background`.** This is the most common way macOS glass
+goes wrong, and it fails silently. `NSGlassEffectView` is documented as "a view that embeds its content
+view in a dynamic glass effect," and its `contentView` property is **nullable** — so wrapping it in an
+`NSViewRepresentable` and applying it as a SwiftUI `.background(...)` compiles, runs, and renders a flat
+grey slab with a thick uniform rim. A `.background(...)` layers the glass view *behind* your content as a
+sibling, so the content slot stays empty and the material has nothing to lens. No `cornerRadius` or
+padding value will thin that rim, because it is a rendering artifact, not a border.
+
+```swift
+// WRONG - flat slab with a thick grey rim
+.background(GlassBackground(radius: 24))   // NSViewRepresentable, contentView never set
+
+// RIGHT
+.glassEffect(.regular, in: .rect(cornerRadius: 24))
+```
+
+Prefer `.glassEffect(_:in:)` on macOS. The shape argument supplies the content relationship the bridged
+view was missing, so the effect is fully specified by construction.
+
+**Turn off the window shadow under glass.** On a borderless `NSPanel`/`NSWindow` whose content is a glass
+surface, set `hasShadow = false`. Liquid Glass draws its own shadow shaped to the glass; AppKit's window
+shadow is shaped to the window. Stacked, they read as one thick, wrong-shaped edge that looks like a
+border.
+
+```swift
+panel.hasShadow = false   // .glassEffect draws its own
+```
+
+**Verifying glass visually:** a screenshot test is only valid if the backdrop's features are larger than
+the blur radius. Fine stripes, small text, and dense noise all average to a flat grey field under the
+backdrop blur, so a *working* effect looks broken and you conclude glass can't sample that content. Use
+large, saturated colour blocks with a hard boundary running under the element, then check two things: the
+boundary visible through the material (transmission), and the boundary **displaced** near the rounded
+corners (refraction — this is the one that distinguishes real glass from a plain blur).
+
 **Glass button tinting:** Always apply `.tint(.clear)` to glass buttons on macOS:
 
 ```swift

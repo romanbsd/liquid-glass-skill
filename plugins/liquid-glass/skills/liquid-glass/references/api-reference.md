@@ -105,18 +105,34 @@ func interactive() -> Glass
 .glassEffect(.regular.tint(Color("accentColor")))
 ```
 
-**Interactive behavior (iOS only):**
+**Interactive behavior:**
 - Scales on press
 - Bouncing animation on release
 - Shimmering effect
 - Touch-point illumination radiating to nearby glass elements
 - Tap and drag responsiveness
 
+These are the touch-driven behaviors, so they are iOS-centric in practice. The modifier is **not**
+unavailable on macOS, though: AppKit's equivalent flag is `effectIsInteractive`, declared
+`API_AVAILABLE(macos(27.0))`, and documented for glass "used as the background for interactive controls
+or when used as the container of interactive controls." On a macOS glass surface hosting only static
+text, no response to hover or press is observable. macOS has no touch input and no accelerometer, so the
+motion-driven specular response seen on iOS has no input source there — macOS glass responds to what
+moves behind it.
+
 ---
 
 ## GlassEffectContainer
 
-Groups multiple glass elements into a unified composition. Critical for visual consistency because glass cannot sample other glass.
+Groups multiple glass elements into a unified composition, merging them when they are in proximity and
+batching their render passes. AppKit's `NSGlassEffectContainerView` documentation describes exactly this:
+it "efficiently merges descendant glass effect views together when they are within a specified proximity
+to each other" and "improve[s] performance by reducing the number of passes required to render similar
+glass effect views." It is also the prerequisite for morphing.
+
+A container around a single glass element does nothing — use one when you have two or more nearby glass
+elements, or when you need `glassEffectID(_:in:)` or `glassEffectUnion(id:namespace:)`, both of which
+require a container.
 
 ```swift
 struct GlassEffectContainer<Content: View>: View {

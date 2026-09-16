@@ -42,7 +42,10 @@ Text("Tinted")
     .padding()
     .glassEffect(.regular.tint(.blue))
 
-// Interactive glass (scales, bounces, shimmers on touch - iOS only)
+// Interactive glass - visual feedback on interaction.
+// Available on macOS too (AppKit's effectIsInteractive is API_AVAILABLE(macos(27.0))),
+// but documented for glass backing interactive controls: on a glass surface hosting
+// only static text, macOS shows no response to hover or press.
 Button("Tap Me") { }
     .glassEffect(.regular.interactive())
 ```
@@ -57,7 +60,13 @@ Button("Tap Me") { }
 
 ### 3. GlassEffectContainer (Critical)
 
-Glass cannot sample other glass. Nearby glass elements MUST share a container for visual consistency and morphing.
+A container merges nearby glass elements and batches their rendering. AppKit documents
+`NSGlassEffectContainerView` as a view that "efficiently merges descendant glass effect views together
+when they are within a specified proximity to each other," with a performance tip about "reducing the
+number of passes required to render similar glass effect views." It is also what makes morphing work.
+
+Group nearby glass elements in one container. A container around a **single** glass element is a no-op —
+skip it unless you are using `glassEffectID(_:in:)` or `glassEffectUnion(id:namespace:)`, which require one.
 
 ```swift
 GlassEffectContainer(spacing: 30.0) {
