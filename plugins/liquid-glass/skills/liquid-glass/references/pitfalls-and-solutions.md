@@ -399,6 +399,28 @@ content.glassEffect(.regular, in: .rect(cornerRadius: 16))
 
 `backgroundExtensionEffect()` and `UIBackgroundExtensionView` are available on visionOS.
 
+### `#available(iOS 26, *)` fails to build for tvOS or watchOS
+
+**Problem:** A view guarded with `if #available(iOS 26, macOS 26, *)` builds and runs on iOS, then fails to
+compile for tvOS, watchOS, or visionOS.
+
+**Cause:** `*` means every platform you did not name is available, so the glass branch is compiled for those
+targets. Separately, `#available` can never bypass an unconditional unavailability like visionOS's.
+
+**Solution:** Name every versioned platform in the list, and split visionOS at compile time:
+
+```swift
+#if os(visionOS)
+content.glassBackgroundEffect()
+#else
+if #available(iOS 26, macOS 26, tvOS 26, watchOS 26, *) {
+    content.glassEffect()
+} else {
+    content.background(.ultraThinMaterial, in: .rect(cornerRadius: 16))
+}
+#endif
+```
+
 ### Glass never appears on older Apple TV
 
 **Problem:** tvOS shows no glass, or custom glass buttons look permanently glassy.
@@ -493,7 +515,7 @@ static let editingBackgroundStyle = Material.ultraThickMaterial
 **Solution:** Use `@available` checks:
 
 ```swift
-if #available(iOS 26, *) {
+if #available(iOS 26, macOS 26, tvOS 26, watchOS 26, *) {
     image.transition(.init(.symbolEffect(.drawOn)))
 } else {
     image.transition(.opacity)

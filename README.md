@@ -43,6 +43,7 @@ Ask Claude Code to work with Liquid Glass — it will automatically apply the sk
 | `SKILL.md` | Core instructions — key APIs, quick start, migration summary |
 | `references/api-reference.md` | Complete API reference for all glass modifiers and types |
 | `references/migration-guide.md` | Phased migration workflow for existing apps, opt-out key, app icon adoption |
+| `references/graceful-degradation.md` | Backward compatibility below 26: availability rules, fallback map, test matrix |
 | `references/platform-specifics.md` | iOS, macOS, iPadOS, watchOS, tvOS, visionOS details |
 | `references/pitfalls-and-solutions.md` | Known issues with tested solutions |
 | `examples/landmarks-patterns.md` | Real code patterns from Apple's Landmarks sample app |

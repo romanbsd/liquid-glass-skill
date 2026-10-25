@@ -75,10 +75,20 @@ Custom backgrounds and materials on navigation elements conflict with automatic 
 .toolbarBackground(.visible, for: .navigationBar)
 .toolbarBackground(Color.blue, for: .navigationBar)
 
-// If backward compatibility needed:
-if #unavailable(iOS 26) {
-    view.toolbarBackground(.visible, for: .navigationBar)
+// If the app still runs below iOS 26, keep the legacy background there.
+// Wrapping it in a @ViewBuilder helper is required: a modifier cannot carry #unavailable inline.
+#if os(iOS)
+extension View {
+    @ViewBuilder
+    func legacyNavigationBarBackground() -> some View {
+        if #unavailable(iOS 26) {
+            toolbarBackground(.visible, for: .navigationBar)
+        } else {
+            self
+        }
+    }
 }
+#endif
 ```
 
 ### Tab bar backgrounds
@@ -284,6 +294,9 @@ Button("Info", systemImage: "info") { showInfo = true }
 }
 ```
 
+`.navigationTransition(.zoom(...))` needs iOS/tvOS 18+, watchOS 11+, or visionOS 2+, and is unavailable on macOS;
+guard it and present a plain sheet there.
+
 ### 3h. Use the glass button style that matches the context
 
 ```swift
@@ -424,61 +437,45 @@ and blurs as the device moves.
 
 ## Backward Compatibility
 
-### Using @available for Gradual Adoption
+If the app still deploys below 26, read [graceful-degradation.md](graceful-degradation.md): full fallback map,
+UIKit/AppKit factories, and the test matrix.
+
+Three rules cover most of the damage:
+
+1. **List every platform.** `*` means "all unlisted platforms are available", so
+   `if #available(iOS 26, macOS 26, *)` compiles the glass branch on tvOS, watchOS, and visionOS and then fails.
+   Use `#available(iOS 26, macOS 26, tvOS 26, watchOS 26, *)`.
+2. **visionOS is `#if`, not `#available`.** The glass family is unconditionally unavailable there, so a version
+   check cannot route around it. Gate with `#if os(visionOS)` and use `glassBackgroundEffect`.
+3. **Branch in a `@ViewBuilder` helper.** Modifiers cannot carry an `if #available`; wrap the effect or style in
+   a `View` extension that returns either implementation.
 
 ```swift
-if #available(iOS 26, macOS 26, *) {
-    view.glassEffect(.regular, in: .rect(cornerRadius: 16))
-} else {
-    view.background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-}
-```
-
-### Conditional Toolbar Styles
-
-```swift
-struct ToolbarLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        if #available(iOS 26, *) {
-            // Icon-only item, as the new toolbar expects; keep a spoken label
-            configuration.icon
-                .accessibilityLabel(configuration.title)
+extension View {
+    @ViewBuilder
+    func glassCompat(cornerRadius: CGFloat = 16) -> some View {
+        #if os(visionOS)
+        glassBackgroundEffect(in: .rect(cornerRadius: cornerRadius))
+        #else
+        if #available(iOS 26, macOS 26, tvOS 26, watchOS 26, *) {
+            glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
         } else {
-            HStack(spacing: 4) {
-                configuration.icon
-                configuration.title
-            }
+            background(.ultraThinMaterial, in: .rect(cornerRadius: cornerRadius))
         }
+        #endif
     }
 }
 ```
+
+Degrade behavior, not only paint: without a morph, a tab-bar collapse, or a background extension, the
+information those effects carried is gone. The reference lists the fallback for each API.
 
 ### SF Symbol Variants
 
-Replace circle-variant SF Symbols with plain variants on iOS 26+:
+Plain symbols work on every OS; circle variants are what iOS 26 removed. Prefer plain symbols unconditionally
+rather than branching:
 
 ```swift
-// Use symbolVariant instead of string manipulation
 Image(systemName: "heart")
     .symbolVariant(isFavorite ? .fill : .none)
-```
-
-### Supporting Multiple OS Versions
-
-```swift
-struct GlassButton: View {
-    let title: String
-    let action: () -> Void
-
-    var body: some View {
-        if #available(iOS 26, macOS 26, *) {
-            Button(title, action: action)
-                .buttonStyle(.glass)
-        } else {
-            Button(title, action: action)
-                .buttonStyle(.bordered)
-        }
-    }
-}
 ```

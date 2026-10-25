@@ -515,6 +515,9 @@ Button("Info", systemImage: "info") { showSheet = true }
 }
 ```
 
+`.navigationTransition(.zoom(...))` is iOS/tvOS 18+, watchOS 11+, visionOS 2+, and **unavailable on macOS** —
+present the sheet without it there. Below those versions, fall back to a plain sheet.
+
 ---
 
 ## visionOS Glass Background APIs

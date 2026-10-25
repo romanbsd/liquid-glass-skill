@@ -1,6 +1,6 @@
 ---
 name: liquid-glass
-description: Build and migrate iOS, macOS, iPadOS, watchOS, tvOS, and visionOS apps with Apple's Liquid Glass design system (iOS 26+, macOS 26 Tahoe+). Use when creating new SwiftUI apps targeting Apple's 2025+ platforms, migrating existing apps to Liquid Glass, applying .glassEffect(), .backgroundExtensionEffect(), .buttonStyle(.glass), GlassEffectContainer, glass toolbars, glass tab bars, glass sidebars, glass sheets, concentric corners, safeAreaBar, or any Liquid Glass UI work. Also use for Liquid Glass app icons and Icon Composer layers, UIDesignRequiresCompatibility, modern Apple design, navigation patterns with glass, or SwiftUI best practices for the latest OS versions.
+description: Build and migrate iOS, macOS, iPadOS, watchOS, tvOS, and visionOS apps with Apple's Liquid Glass design system (iOS 26+, macOS 26 Tahoe+). Use when creating new SwiftUI apps targeting Apple's 2025+ platforms, migrating existing apps to Liquid Glass, applying .glassEffect(), .backgroundExtensionEffect(), .buttonStyle(.glass), GlassEffectContainer, glass toolbars, glass tab bars, glass sidebars, glass sheets, concentric corners, safeAreaBar, or any Liquid Glass UI work. Also use for graceful degradation and backward compatibility when deployment targets are below iOS 26, Liquid Glass app icons and Icon Composer layers, UIDesignRequiresCompatibility, modern Apple design, navigation patterns with glass, or SwiftUI best practices for the latest OS versions.
 ---
 
 # Liquid Glass Design System for Apple Platforms
@@ -226,6 +226,10 @@ For detailed migration steps, see [references/migration-guide.md](references/mig
 6. Drop `.circle` symbol variants: toolbar buttons are no longer circled on iOS 26+, so use plain symbols with `.symbolVariant()` for state
 7. Rebuild the app icon in Icon Composer with separate layers and check the light, dark, clear, and tinted variants
 8. Test accessibility (Reduced Transparency, Increased Contrast, Reduced Motion, preferred Liquid Glass look)
+
+Deploying below the 26 OSes? Availability is the risk, not the design. See
+[references/graceful-degradation.md](references/graceful-degradation.md) for the platform-complete `#available`
+rule, the visionOS `#if` split, and a fallback for every 26-only API.
 
 ## Platform Considerations
 
