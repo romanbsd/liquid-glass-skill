@@ -185,8 +185,10 @@ TabView {
     Tab("Home", systemImage: "house") { HomeView() }
     Tab("Search", systemImage: "magnifyingglass") { SearchView() }
 }
-.tabBarMinimizeBehavior(.onScrollDown) // Collapse tab bar on scroll
+.tabBarMinimizeBehavior(.onScrollDown) // Collapse tab bar on scroll (iOS only)
 ```
+
+`.onScrollDown`, `.onScrollUp`, and `.never` are iOS-only values; `.automatic` is the portable one.
 
 Use `.tabViewStyle(.sidebarAdaptable)` to let a tab bar become a sidebar on iPad and Mac (UIKit:
 `UITabBarController.Mode.tabSidebar`). Give the search tab `role: .search`, so the system separates it and
@@ -221,7 +223,7 @@ For detailed migration steps, see [references/migration-guide.md](references/mig
 3. Replace custom materials on navigation elements with glass modifiers
 4. Wrap grouped glass elements in `GlassEffectContainer`
 5. Add `.backgroundExtensionEffect()` to hero images
-6. Update SF Symbol variants (circle variants -> none variants on iOS 26+)
+6. Drop `.circle` symbol variants: toolbar buttons are no longer circled on iOS 26+, so use plain symbols with `.symbolVariant()` for state
 7. Rebuild the app icon in Icon Composer with separate layers and check the light, dark, clear, and tinted variants
 8. Test accessibility (Reduced Transparency, Increased Contrast, Reduced Motion, preferred Liquid Glass look)
 

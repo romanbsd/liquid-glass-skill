@@ -71,9 +71,11 @@ view.glassEffect(showGlass ? .regular : .identity)
 `ConcentricRectangle` resolves each corner against the container shape. System views supply one; for custom
 containers, declare it with `.containerShape(...)`. Note that `containerConcentric` belongs to
 `CornerMaskingConfiguration`, not to `CGFloat` — `.rect(cornerRadius: .containerConcentric)` does not compile.
+In UIKit, `UIView.cornerConfiguration` / `UICornerConfiguration` provides the equivalent concentric corners.
 
 The currently documented SwiftUI signature has no `isEnabled` parameter. Apply this modifier after
-other modifiers that affect appearance because SwiftUI captures the modified content.
+other modifiers that affect appearance because SwiftUI captures the modified content. The material is
+anchored to the view's bounds, so padding applied before the modifier is included in the glass shape.
 
 **Availability:** iOS 26.0+, iPadOS 26.0+, Mac Catalyst 26.0+, macOS 26.0+, tvOS 26.0+, watchOS 26.0+.
 **Unavailable on visionOS** — use `glassBackgroundEffect` there instead.
@@ -190,6 +192,9 @@ func glassEffectID(
 2. Each view needs `glassEffectID` with a shared `@Namespace`
 3. Conditional show/hide triggers morphing animation
 4. Wrap state change in `withAnimation`
+
+The identifier is optional: pass `nil` to keep a glass view in the hierarchy without giving it an identity to
+morph from or into.
 
 ```swift
 @Namespace private var namespace
@@ -460,6 +465,8 @@ TabView { /* tabs */ }
     .tabBarMinimizeBehavior(.onScrollDown)
 ```
 
+`.automatic` is cross-platform; `.onScrollDown`, `.onScrollUp`, and `.never` are iOS-only.
+
 ### Bottom Accessory
 
 iOS, iPadOS, and Mac Catalyst only. On iPhone it sits above the tab bar at normal size and inline when the
@@ -586,4 +593,15 @@ var body: some View {
 }
 ```
 
+Note this is a fallback, not the default: system components already adapt to these settings, so prefer letting
+them. Only override a custom glass element when the adapted appearance is still not legible.
+
 ---
+
+## Further Reading
+
+- [Applying Liquid Glass to custom views](https://developer.apple.com/documentation/SwiftUI/Applying-Liquid-Glass-to-custom-views)
+- [Adopting Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass)
+- [HIG: Materials](https://developer.apple.com/design/human-interface-guidelines/materials)
+- [Optimize your app's UI performance](https://developer.apple.com/videos/play/tech-talks/10855/)
+- [WWDC25: Build a SwiftUI app with the new design](https://developer.apple.com/videos/play/wwdc2025/323/)

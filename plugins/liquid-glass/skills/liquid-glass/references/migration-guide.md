@@ -134,6 +134,13 @@ Controls are rounder and, in places, larger. Audit fixed heights, paddings, and 
 spacing so the app follows the new metrics. `Form`/`List` rows gained height and sections gained corner
 radius, so custom row heights that were tuned against the old design usually need to grow.
 
+### Menu item icons and ordering
+
+Menus adopt glass, and common commands now show icons. Let the system supply them: keep standard selectors for
+Cut/Copy/Paste and similar actions, and use `Label`/`LabeledContent` for custom ones instead of hand-picking
+symbols. Align the actions at the top of a context menu with the swipe actions for the same row; people expect
+the same commands in both places.
+
 ### Action sheet origin
 
 An action sheet or confirmation dialog now originates from the control that triggered it rather than the
@@ -434,9 +441,14 @@ if #available(iOS 26, macOS 26, *) {
 struct ToolbarLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         if #available(iOS 26, *) {
-            Label(configuration)
+            // Icon-only item, as the new toolbar expects; keep a spoken label
+            configuration.icon
+                .accessibilityLabel(configuration.title)
         } else {
-            Label(configuration).labelStyle(.titleOnly)
+            HStack(spacing: 4) {
+                configuration.icon
+                configuration.title
+            }
         }
     }
 }

@@ -30,25 +30,27 @@ Detailed platform considerations for implementing Liquid Glass across Apple plat
 
 ```swift
 #if os(iOS)
-// Phone-specific toolbar visibility
-if UIDevice.current.userInterfaceIdiom == .phone {
-    .toolbarVisibility(.visible, for: .automatic)
-    .toolbar {
-        Button { inspectorIsPresented.toggle() } label: {
-            Label("Toggle Inspector", systemImage: "info.circle")
-        }
+struct InspectorToolbar: ViewModifier {
+    @Binding var inspectorIsPresented: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if UIDevice.current.userInterfaceIdiom == .phone {
+                    ToolbarItem {
+                        Button { inspectorIsPresented.toggle() } label: {
+                            Label("Toggle Inspector", systemImage: "info.circle")
+                        }
+                    }
+                }
+            }
     }
 }
 
-// Inline navigation title
-.navigationBarTitleDisplayMode(.inline)
-
-// Smaller grid item sizes for compact screens
-static var gridItemMinSize: CGFloat {
-    if UIDevice.current.userInterfaceIdiom == .phone {
-        return 160.0
-    }
-    return 240.0
+// Smaller grid item sizes for compact screens (inside a constants type)
+var gridItemMinSize: CGFloat {
+    UIDevice.current.userInterfaceIdiom == .phone ? 160.0 : 240.0
 }
 #endif
 ```
@@ -72,13 +74,13 @@ static var gridItemMinSize: CGFloat {
 
 ```swift
 #if os(iOS)
-if UIDevice.current.userInterfaceIdiom == .pad {
-    // Larger grid sizes
-    static let gridItemMinSize: CGFloat = 220.0
-    static let gridItemEditingMinSize: CGFloat = 180.0
+// Inside a constants type
+static var gridItemMinSize: CGFloat {
+    UIDevice.current.userInterfaceIdiom == .pad ? 220.0 : 160.0
+}
 
-    // Hide phone-specific toolbar items
-    .toolbarVisibility(.hidden, for: .automatic)
+static var gridItemEditingMinSize: CGFloat {
+    UIDevice.current.userInterfaceIdiom == .pad ? 180.0 : 160.0
 }
 #endif
 ```

@@ -365,6 +365,17 @@ GlassEffectContainer(spacing: 16) {
 }
 ```
 
+### Glass elements crowd or stack
+
+**Problem:** Several glass controls packed together, or one glass surface layered on another, read as a single
+muddy shape.
+
+**Cause:** Every glass surface draws its own rim and shadow and samples its own backdrop; overlapping them
+compounds those edges. HIG also warns against layering Liquid Glass elements on top of each other.
+
+**Solution:** Keep one glass layer per region, use standard spacing rather than tight or negative padding, and
+move secondary actions into a menu instead of adding more glass.
+
 ---
 
 ## Availability Issues
