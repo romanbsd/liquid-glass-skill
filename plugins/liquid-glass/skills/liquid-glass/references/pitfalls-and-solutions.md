@@ -9,7 +9,8 @@ Known issues, workarounds, and best practices when working with Liquid Glass.
 3. [Performance Issues](#performance-issues)
 4. [Interaction Issues](#interaction-issues)
 5. [Layout Issues](#layout-issues)
-6. [Migration Issues](#migration-issues)
+6. [Availability Issues](#availability-issues)
+7. [Migration Issues](#migration-issues)
 
 ---
 
@@ -54,6 +55,26 @@ Button("Action") { }
     .tint(.clear)
     #endif
 ```
+
+### Clear glass over bright content is unreadable
+
+**Problem:** `.clear` glass over a bright photo or video leaves text and controls hard to read.
+
+**Cause:** Clear glass is highly translucent by design — it prioritizes the media, not legibility.
+
+**Solution:** Add a dark dimming layer at 35% opacity beneath the glass (HIG's figure). Skip it when the
+content beneath is already dark, or when AVKit playback controls supply their own dimming. If the component
+carries a lot of text (alerts, sidebars, popovers), use `.regular` instead — it blurs and adjusts luminosity.
+
+### Background extension effect appears to do nothing
+
+**Problem:** `backgroundExtensionEffect()` is applied but nothing extends under the sidebar or inspector.
+
+**Cause:** The effect only mirrors into available safe-area space. Padding on the enclosing `ScrollView` or
+`VStack`, or an edge that does not reach the containing view, leaves no space to fill.
+
+**Solution:** Remove padding from the containers and align the view's edges with the containing view. Apply
+the modifier before overlays so only the image extends.
 
 ### Sheet background conflicts
 
@@ -257,6 +278,23 @@ Button("Action") { }
     .contentShape(.rect(cornerRadius: 16))
 ```
 
+### Toolbar item leaves an empty glass capsule
+
+**Problem:** Hiding a toolbar button's contents leaves a blank glass pill or a gap in the toolbar.
+
+**Cause:** The view inside the item was hidden, but the item is still in the toolbar.
+
+**Solution:** Hide the item itself:
+
+```swift
+ToolbarItem {
+    Button("Favorite", systemImage: "heart") { }
+}
+.hidden(isEditing)          // SwiftUI: ToolbarContent.hidden(_:)
+// UIKit: barButtonItem.isHidden = isEditing
+// AppKit: toolbarItem.isHidden = isEditing
+```
+
 ### Interactive glass not responding
 
 **Problem:** `.interactive()` glass doesn't scale/bounce on interaction.
@@ -291,6 +329,23 @@ Image(imageName)
 .ignoresSafeArea(edges: .top)
 ```
 
+### Concentric corners don't compile
+
+**Problem:** `.glassEffect(.regular, in: .rect(cornerRadius: .containerConcentric))` fails to compile.
+
+**Cause:** `.containerConcentric` belongs to `CornerMaskingConfiguration.CornerStyle`, not `CGFloat`.
+`cornerRadius:` only accepts a number.
+
+**Solution:** Use `ConcentricRectangle`, or the shape convenience that takes corner styles:
+
+```swift
+view.glassEffect(.regular, in: ConcentricRectangle())
+view.glassEffect(.regular, in: .rect(corners: .concentric(minimum: 16)))
+```
+
+Corners resolve against the container shape. System views supply one; for a custom container add
+`.containerShape(...)`, otherwise the corners have nothing to be concentric with and can resolve to zero.
+
 ### Glass container sizing
 
 **Problem:** `GlassEffectContainer` doesn't size correctly.
@@ -312,7 +367,64 @@ GlassEffectContainer(spacing: 16) {
 
 ---
 
+## Availability Issues
+
+### `glassEffect` doesn't exist on visionOS
+
+**Problem:** The build fails with an availability error for `glassEffect`, `Glass`, `GlassEffectContainer`,
+`glassEffectID`, `glassEffectUnion`, `glassEffectTransition`, or `.buttonStyle(.glass)` when targeting visionOS.
+
+**Cause:** The whole SwiftUI glass family is marked unavailable on visionOS. visionOS has its own spatial glass.
+
+**Solution:** Gate the code and use `glassBackgroundEffect` there:
+
+```swift
+#if os(visionOS)
+content.glassBackgroundEffect()
+#else
+content.glassEffect(.regular, in: .rect(cornerRadius: 16))
+#endif
+```
+
+`backgroundExtensionEffect()` and `UIBackgroundExtensionView` are available on visionOS.
+
+### Glass never appears on older Apple TV
+
+**Problem:** tvOS shows no glass, or custom glass buttons look permanently glassy.
+
+**Cause:** Liquid Glass requires Apple TV 4K (2nd generation) or newer; older devices keep the previous
+appearance. Separately, `.buttonStyle(.glass)` applies glass regardless of focus on tvOS.
+
+**Solution:** Test on supported hardware, and drive custom control appearance from focus
+(`focusable(_:)`, `@FocusState`, `isFocused`) instead of assuming glass is tied to focus.
+
+---
+
 ## Migration Issues
+
+### Ship with the new SDK without adopting the new look
+
+**Problem:** A release has to go out built against the Xcode 26 SDKs before the UI redesign is finished, but
+the new appearance changes the whole interface.
+
+**Solution:** Add `UIDesignRequiresCompatibility` = `YES` to the Info pane. The system then runs the app with
+the previous SDK's UI while you keep reviewing. It is explicitly temporary: the system ignores the key once
+you build with the 27-era SDKs (iOS/iPadOS/Mac Catalyst/macOS/tvOS 27+).
+
+```xml
+<key>UIDesignRequiresCompatibility</key>
+<true/>
+```
+
+### Mixing text and icon toolbar items in one group
+
+**Problem:** A glass toolbar group looks uneven.
+
+**Cause:** Items sharing a glass background are read as one control; mixing text labels and icons breaks that
+rhythm and HIG explicitly advises against it.
+
+**Solution:** Use icons for common actions and give each one an accessibility label. Keep text-only and
+icon-only items in separate groups, or span them apart with a fixed spacer.
 
 ### Custom toolbar backgrounds override glass
 

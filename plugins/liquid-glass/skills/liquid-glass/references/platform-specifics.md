@@ -83,6 +83,22 @@ if UIDevice.current.userInterfaceIdiom == .pad {
 #endif
 ```
 
+### Tab bar to sidebar
+
+```swift
+TabView { /* tabs */ }
+    .tabViewStyle(.sidebarAdaptable)
+```
+
+UIKit: `UITabBarController.Mode.tabSidebar`. The system decides tab bar versus sidebar from context, so
+don't branch on size class to pick a layout.
+
+### Windows and multitasking
+
+iPadOS windows have window controls and resize continuously rather than snapping between presets. Support
+arbitrary window sizes, let `NavigationSplitView` reflow its columns, and set safe areas so the system can
+position window controls and the title bar around your content.
+
 ### Split View with Glass
 
 ```swift
@@ -183,6 +199,10 @@ let editButtonPlacement: ToolbarItemPlacement = .topBarTrailing
 #endif
 ```
 
+**AppKit buttons:** `NSButton.BezelStyle.glass` gives an AppKit button the glass appearance without bridging
+SwiftUI. `NSGlassEffectView` exposes `style`, `tintColor`, `cornerRadius`, `contentView`, and (macOS 27+)
+`effectIsInteractive`.
+
 **Window configuration:**
 
 ```swift
@@ -203,34 +223,47 @@ WindowGroup {
 ## watchOS 26
 
 ### Glass on Apple Watch
-- Simplified glass effects for smaller display
-- System handles glass on navigation elements automatically
-- Limited custom glass usage recommended (screen real estate)
-- TabView with glass tab bar adapts to watch form factor
+
+Liquid Glass changes on watchOS are deliberately minimal, and they appear on the latest OS even if the app was
+not rebuilt against the new SDK. What reliably picks them up is using standard button styles and toolbar APIs
+(the watchOS 10 APIs) — not hand-rolling glass.
+
+- Navigation and toolbars are handled by the system; don't rebuild them from custom glass.
+- Prefer standard button styles. `.glassEffect` is available on watchOS 26, but screen area is scarce.
+- Keep custom glass to one small, transient element, and profile it.
+- Don't remove or replace the material backgrounds that modal sheets get by default; watchOS relies on them
+  for contrast.
 
 ### Considerations
-- Avoid complex `GlassEffectContainer` layouts on watch
-- Use `.regular` style only (`.clear` less effective on small screens)
-- Test with all watch face complications active
-- `.interactive()` works with Digital Crown interactions
+
+- With a container that blends shapes, a small screen leaves little room before everything reads as one blob.
+- Test with Always-On display and with every complication/watch face you support.
+- Reduce Motion and Reduce Transparency matter more here: the display is small and always with the person.
 
 ---
 
 ## tvOS 26
 
+Liquid Glass requires Apple TV 4K (2nd generation) or newer; older devices keep their current appearance.
+
 ### Glass on Apple TV
-- Focus-driven glass interactions
-- Glass elements highlight on focus
-- Remote-friendly touch targets
-- Background extension effects work with media-rich content
+
+- Standard buttons and controls take on glass when focus moves to them. Adopt the standard focus APIs so
+  custom controls match (`focusable(_:)`, `@FocusState`, `isFocused`).
+- In tvOS, `.buttonStyle(.glass)` and `.glassProminent` apply the effect **whether or not** the button has
+  focus — so don't reach for them expecting focus-driven styling.
+- `ToolbarSpacer` is not available on tvOS; size toolbar gaps with the platform's own toolbar APIs.
+- `backgroundExtensionEffect()` is available and suits media-rich layouts.
 
 ### Focus-Aware Glass
 
 ```swift
+@FocusState private var isFocused: Bool
+
 Button("Play") { }
-    .buttonStyle(.glass)
     .focusable()
-    // Glass automatically responds to focus state on tvOS
+    .focused($isFocused)
+    // Let the system style the standard button on focus; use isFocused only for extra custom emphasis
 ```
 
 ---
@@ -238,10 +271,20 @@ Button("Play") { }
 ## visionOS 26
 
 ### Glass in Spatial Computing
-- Glass integrates with spatial UI paradigms
-- Window ornaments use glass automatically
-- Volumetric content benefits from glass overlays
-- System handles glass depth and parallax
+
+visionOS does **not** use SwiftUI's control-oriented glass APIs. `glassEffect`, `Glass`,
+`GlassEffectContainer`, `glassEffectID`, `glassEffectUnion`, `glassEffectTransition`, and
+`.buttonStyle(.glass)` are all marked unavailable there.
+
+- Windows are drawn with a system-defined glass material you cannot modify. Prefer translucency over opaque
+  fills: opacity blocks people's view of their surroundings and makes them feel constricted.
+- For a custom glass surface, use `glassBackgroundEffect(displayMode:)` (visionOS 1+). `GlassBackgroundEffect`
+  adds `.automatic`, `.plate`, and `.feathered` configurations (visionOS 2.4+).
+- Ornaments, toolbars, and window chrome receive system glass automatically.
+- `backgroundExtensionEffect()` and `UIBackgroundExtensionView` do exist on visionOS, unlike the rest of the
+  glass family.
+- visionOS applies vibrancy to text, symbols, and fills over materials; use the three visionOS vibrancy values
+  to communicate hierarchy rather than hard-coded colors.
 
 ---
 

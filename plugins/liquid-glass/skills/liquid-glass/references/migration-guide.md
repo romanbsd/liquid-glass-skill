@@ -4,12 +4,34 @@ Step-by-step guide for migrating existing iOS/macOS/iPadOS apps to the Liquid Gl
 
 ## Table of Contents
 
-1. [Phase 1: Automatic Adoption](#phase-1-automatic-adoption)
-2. [Phase 2: Remove Conflicting Customizations](#phase-2-remove-conflicting-customizations)
-3. [Phase 3: Enhance with Glass APIs](#phase-3-enhance-with-glass-apis)
-4. [Phase 4: Platform-Specific Refinements](#phase-4-platform-specific-refinements)
-5. [Phase 5: Accessibility and Testing](#phase-5-accessibility-and-testing)
-6. [Backward Compatibility](#backward-compatibility)
+1. [Phase 0: Decide When to Adopt](#phase-0-decide-when-to-adopt)
+2. [Phase 1: Automatic Adoption](#phase-1-automatic-adoption)
+3. [Phase 2: Remove Conflicting Customizations](#phase-2-remove-conflicting-customizations)
+4. [Phase 3: Enhance with Glass APIs](#phase-3-enhance-with-glass-apis)
+5. [Phase 4: Platform-Specific Refinements](#phase-4-platform-specific-refinements)
+6. [Phase 5: Accessibility and Testing](#phase-5-accessibility-and-testing)
+7. [App Icon Adoption](#app-icon-adoption)
+8. [Backward Compatibility](#backward-compatibility)
+
+---
+
+## Phase 0: Decide When to Adopt
+
+Compiling with the Xcode 26 SDKs changes the appearance of every standard component at once. If a release has
+to ship before the redesign has been reviewed, put the app into the system's temporary compatibility mode with
+the `UIDesignRequiresCompatibility` Info.plist key.
+
+```xml
+<key>UIDesignRequiresCompatibility</key>
+<true/>
+```
+
+- `YES` renders the app as it looked when built against previous SDKs.
+- `NO`, or omitting the key, uses the running OS's design (the default for apps linking the new SDKs).
+- The system **ignores the key** when you build with iOS/iPadOS/Mac Catalyst/macOS/tvOS 27 or later, so it
+  buys schedule time, not a permanent opt-out.
+
+Remove the key as soon as the UI review is done. The rest of this guide assumes the new design is active.
 
 ---
 
@@ -26,6 +48,13 @@ Step-by-step guide for migrating existing iOS/macOS/iPadOS apps to the Liquid Gl
 - Alerts and confirmation dialogs
 - Context menus and popovers
 - System controls (toggles, sliders, steppers)
+
+Platform nuances:
+- **watchOS**: changes are minimal and show up on the latest OS even without rebuilding. What you must adopt
+  is standard toolbar APIs and button styles from watchOS 10; without them the new look can skip your controls.
+- **tvOS**: Liquid Glass requires Apple TV 4K (2nd generation) or newer. Older devices keep the previous
+  appearance, so verify on supported hardware.
+- **visionOS**: the SwiftUI glass family is unavailable; system windows already use a system-defined glass.
 
 ### Steps:
 1. Open project in Xcode 26
@@ -86,6 +115,31 @@ UITabBar.appearance().backgroundColor = .systemBackground  // Remove
 ### Inline navigation title display mode
 
 Review `.navigationBarTitleDisplayMode(.inline)` usage. With glass, the system may handle title presentation differently.
+
+### Popover and sheet backgrounds
+
+Remove any `UIVisualEffectView` (or SwiftUI material) used as a custom background inside popover content, and
+remove `.presentationBackground(...)` from sheets. Both overlay the system's own treatment and produce a
+double-material look. Half sheets are now inset from the display edge; check that content peeking through
+between the sheet and the edge looks intentional.
+
+### Section header capitalization
+
+Lists, tables, and forms now render section headers with title-style capitalization and ignore the
+all-caps text you may have hard-coded. Update headers to title case and stop applying `.textCase(.uppercase)`.
+
+### Hard-coded control metrics
+
+Controls are rounder and, in places, larger. Audit fixed heights, paddings, and row metrics; prefer standard
+spacing so the app follows the new metrics. `Form`/`List` rows gained height and sections gained corner
+radius, so custom row heights that were tuned against the old design usually need to grow.
+
+### Action sheet origin
+
+An action sheet or confirmation dialog now originates from the control that triggered it rather than the
+bottom edge, and other interface elements stay interactive. Set `sourceView`/`sourceItem` on the popover
+presentation controller (SwiftUI `confirmationDialog` handles the anchor for you) so it points at the right
+control.
 
 ---
 
@@ -223,6 +277,36 @@ Button("Info", systemImage: "info") { showInfo = true }
 }
 ```
 
+### 3h. Use the glass button style that matches the context
+
+```swift
+Button("Play") { }
+    .buttonStyle(.glass(.clear))          // clear over media
+
+Button("Tint") { }
+    .buttonStyle(.glass(.regular.tint(.accentColor)))
+
+// UIKit
+let config = UIButton.Configuration.glass()      // or .prominentGlass(), .clearGlass(), .prominentClearGlass()
+```
+
+On tvOS, glass button styles apply the effect whether or not the button has focus; prefer standard focus APIs
+for custom controls.
+
+### 3i. Let the tab bar adapt into a sidebar
+
+```swift
+TabView {
+    Tab("Home", systemImage: "house") { HomeView() }
+    Tab("Search", systemImage: "magnifyingglass", role: .search) { SearchView() }
+}
+.tabViewStyle(.sidebarAdaptable)
+```
+
+The system then chooses tab bar or sidebar per platform and context. In UIKit, set
+`UITabBarController.Mode.tabSidebar`. Keep the search tab as a real search tab (`role: .search`) so the system
+separates it and places it at the trailing end.
+
 ---
 
 ## Phase 4: Platform-Specific Refinements
@@ -291,7 +375,7 @@ Liquid Glass auto-adapts for these settings (no code needed):
 - Reduced Transparency
 - Increased Contrast
 - Reduced Motion
-- Tinted Mode (iOS 26.1+)
+- Preferred Liquid Glass look (Clear or Tinted, iOS 26.1+)
 
 ### Manual Testing Checklist
 
@@ -311,6 +395,23 @@ Liquid Glass auto-adapts for these settings (no code needed):
 content
     .glassEffect(reduceTransparency ? .identity : .regular)
 ```
+
+---
+
+## App Icon Adoption
+
+Liquid Glass extends to the app icon, which is now composed of layers the system lights, refracts, shadows,
+and blurs as the device moves.
+
+1. **Design in layers.** Split the artwork into background, middle, and foreground elements in your design
+   tool; the system animates and lights each separately.
+2. **Compose in Icon Composer.** Drag the exported layers in, set the background, group layers, tune opacity,
+   and preview the system effects and appearances. Icon Composer ships with Xcode and is available from
+   Apple Design Resources.
+3. **Provide all four appearances:** default (light), dark, clear, and tinted. The Settings app lets people
+   pick one, so an icon that only works in light mode is incomplete.
+4. **Check the new grids and masks.** Rounded rectangle on iOS, iPadOS, and macOS; circular on watchOS. Keep
+   elements centered to avoid clipping, and expect an irregularly shaped icon to receive a system background.
 
 ---
 

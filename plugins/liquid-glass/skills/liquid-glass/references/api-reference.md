@@ -43,8 +43,8 @@ func glassEffect(
 **Supported shapes:**
 - `.capsule` (default)
 - `.circle`
-- `RoundedRectangle(cornerRadius: 16)`
-- `.rect(cornerRadius: .containerConcentric)` - auto-aligns with container corners
+- `RoundedRectangle(cornerRadius: 16)` / `.rect(cornerRadius: 16)`
+- `ConcentricRectangle` / `.rect(corners: .concentric(minimum: 16))` — corners concentric with the container shape
 - `.ellipse`
 - Any custom `Shape` conformance
 
@@ -60,17 +60,23 @@ view.glassEffect(.regular, in: .rect(cornerRadius: 24))
 // Circle
 view.glassEffect(.regular, in: .circle)
 
-// Concentric corners (matches container)
-view.glassEffect(.regular, in: .rect(cornerRadius: .containerConcentric))
+// Concentric corners (matches the container)
+view.glassEffect(.regular, in: ConcentricRectangle())
+    // or: .glassEffect(.regular, in: .rect(corners: .concentric(minimum: 16)))
 
 // Conditionally enabled
 view.glassEffect(showGlass ? .regular : .identity)
 ```
 
+`ConcentricRectangle` resolves each corner against the container shape. System views supply one; for custom
+containers, declare it with `.containerShape(...)`. Note that `containerConcentric` belongs to
+`CornerMaskingConfiguration`, not to `CGFloat` — `.rect(cornerRadius: .containerConcentric)` does not compile.
+
 The currently documented SwiftUI signature has no `isEnabled` parameter. Apply this modifier after
 other modifiers that affect appearance because SwiftUI captures the modified content.
 
-**Availability:** iOS 26.0+, macOS 26.0+, iPadOS 26.0+, watchOS 26.0+, tvOS 26.0+, visionOS 26.0+
+**Availability:** iOS 26.0+, iPadOS 26.0+, Mac Catalyst 26.0+, macOS 26.0+, tvOS 26.0+, watchOS 26.0+.
+**Unavailable on visionOS** — use `glassBackgroundEffect` there instead.
 
 ---
 
@@ -85,6 +91,9 @@ The `Glass` struct defines the material appearance.
 | `.regular` | Standard glass: medium transparency, full adaptation. For toolbars, buttons, nav bars |
 | `.clear` | High transparency, limited adaptation. For media-rich backgrounds with bold/bright overlay content |
 | `.identity` | No glass effect. For conditionally disabling glass |
+
+Availability matches `glassEffect`: iOS 26, iPadOS 26, Mac Catalyst 26, macOS 26, tvOS 26, watchOS 26 —
+`Glass` is unavailable on visionOS.
 
 ### Instance Methods
 
@@ -170,8 +179,8 @@ GlassEffectContainer(spacing: 30.0) {
 Links glass elements for morphing transitions within a `GlassEffectContainer`.
 
 ```swift
-func glassEffectID<ID: Hashable & Sendable>(
-    _ id: ID?,
+func glassEffectID(
+    _ id: (some Hashable & Sendable)?,
     in namespace: Namespace.ID
 ) -> some View
 ```
@@ -233,6 +242,10 @@ func glassEffectTransition(_ transition: GlassEffectTransition) -> some View
   are farther apart than the container spacing.
 - `.identity` applies no transition.
 
+`matchedGeometry` is the default for effects that appear or disappear within the container's spacing. With
+the default animation it also applies scale and offset to content when a shape's identity stays the same but
+its content changes; pass an explicit `.spring` to opt out of those extra animations.
+
 ```swift
 if isExpanded {
     Image(systemName: "note")
@@ -253,6 +266,16 @@ Extends and blurs visual content beyond a view's bounds, creating continuous bac
 SwiftUI provides `backgroundExtensionEffect()` and `backgroundExtensionEffect(isEnabled: Bool)`. The
 effect mirrors and blurs view content into available safe areas around its bounds. UIKit provides
 `UIBackgroundExtensionView` for UIKit hierarchies.
+
+Align the view's edges with the enclosing view — no padding on the surrounding `ScrollView`/`VStack`, and the
+trailing edge flush with the containing view — because the effect only fills available safe-area space. Apply
+it before adding overlays, so only the image extends beneath the sidebar or inspector.
+
+**Availability:** iOS 26+, iPadOS 26+, Mac Catalyst 26+, macOS 26+, tvOS 26+, watchOS 26+, and visionOS 26+ —
+one of the few glass modifiers that does ship on visionOS.
+
+Apply it with discretion: the view is duplicated into mirrored, blurred copies, so prefer a single background
+instance per layout and weigh visual clarity against the extra rendering.
 
 **Use cases:**
 - Hero images that extend behind toolbars/navigation bars
@@ -288,6 +311,16 @@ ScrollView { content }
 Styles are `.automatic`, `.hard`, and `.soft`; pass `nil` to restore automatic behavior. UIKit provides
 `UIScrollEdgeElementContainerInteraction` for overlay descendants that should shape a scroll edge effect.
 
+For a custom bar rather than a system toolbar, use `safeAreaBar` (iOS 26+, macOS 26+, tvOS 26+, watchOS 26+,
+visionOS 26+). It insets the content, adjusts the safe area, and shapes the scroll edge effect around the bar:
+
+```swift
+content
+    .safeAreaBar(edge: .bottom) {
+        PlaybackBar()
+    }
+```
+
 **Best practices:**
 - Test legibility across different images, themes, and contexts
 - Combine with gradients for text readability over extended backgrounds
@@ -318,6 +351,24 @@ Button("Save") { }
 
 **Note:** `.confirmationAction` toolbar placement auto-applies `.glassProminent`.
 
+### .glass(_:)
+
+Parameterized variant — pass any `Glass`, including a tint or the clear variant:
+
+```swift
+Button("Play") { }
+    .buttonStyle(.glass(.clear))
+
+Button("Tint") { }
+    .buttonStyle(.glass(.regular.tint(.blue)))
+```
+
+### Native equivalents
+
+- UIKit: `UIButton.Configuration.glass()`, `.prominentGlass()`, `.clearGlass()`, `.prominentClearGlass()`
+- AppKit: `NSButton.BezelStyle.glass`
+- tvOS: both SwiftUI glass button styles apply the effect whether or not the button has focus
+
 **macOS note:** Apply `.tint(.clear)` on glass buttons for proper rendering:
 
 ```swift
@@ -340,6 +391,9 @@ Toolbar items automatically receive glass styling when compiled with Xcode 26.
 ToolbarSpacer(.flexible)  // Expands to fill available space
 ToolbarSpacer(.fixed)     // System-default fixed spacing
 ```
+
+`ToolbarSpacer` is available on iOS 26, iPadOS 26, Mac Catalyst 26, and macOS 26. UIKit and AppKit use
+`UIBarButtonItem.fixedSpace(_:)` and `NSToolbarItem.Identifier.space`.
 
 ### ToolbarItemGroup
 
@@ -368,6 +422,20 @@ ToolbarItemGroup {
 .toolbar(removing: .title)
 ```
 
+### Hiding Items
+
+Hide the `ToolbarItem`, not its contents — hiding only the content leaves an empty glass pill:
+
+```swift
+ToolbarItem {
+    Button("Favorite", systemImage: "heart") { }
+}
+.hidden(isEditing)   // ToolbarContent.hidden(_:)
+
+// UIKit: barButtonItem.isHidden = isEditing
+// AppKit: toolbarItem.isHidden = isEditing
+```
+
 ---
 
 ## TabView Glass APIs
@@ -375,6 +443,15 @@ ToolbarItemGroup {
 ### Automatic Glass
 
 Tab bars auto-adopt glass when compiled with Xcode 26 SDK. No code changes needed.
+
+### Tab Bar to Sidebar
+
+```swift
+TabView { /* tabs */ }
+    .tabViewStyle(.sidebarAdaptable)
+```
+
+UIKit equivalent: `UITabBarController.Mode.tabSidebar` (iOS/iPadOS 18+, visionOS 2+).
 
 ### Tab Bar Minimize
 
@@ -384,6 +461,9 @@ TabView { /* tabs */ }
 ```
 
 ### Bottom Accessory
+
+iOS, iPadOS, and Mac Catalyst only. On iPhone it sits above the tab bar at normal size and inline when the
+bar is collapsed; read `\.tabViewBottomAccessoryPlacement` to adapt its content.
 
 ```swift
 .tabViewBottomAccessory {
@@ -432,9 +512,11 @@ Button("Info", systemImage: "info") { showSheet = true }
 
 ## visionOS Glass Background APIs
 
-`glassEffect` styles custom controls; visionOS also offers a depth-aware glass background for spatial
-views. The background affects z-axis layout. Apply it to an explicit `ZStack` when the glass should
-enclose a composed group, rather than an individual child.
+SwiftUI's control-oriented glass APIs are **unavailable on visionOS**: `glassEffect`, `Glass`,
+`GlassEffectContainer`, `glassEffectID`, `glassEffectUnion`, `glassEffectTransition`, and
+`.buttonStyle(.glass)` all carry `@available(visionOS, unavailable)`. Custom spatial glass uses
+`glassBackgroundEffect`, which fills a view's background and affects z-axis layout. Apply it to an explicit
+`ZStack` when the glass should enclose a composed group, rather than an individual child.
 
 ```swift
 view.glassBackgroundEffect(displayMode: .implicit)
@@ -446,21 +528,30 @@ view.glassBackgroundEffect(.feathered(padding: 12, softEdgeRadius: nil),
 `GlassBackgroundDisplayMode` supports `.always`, `.implicit` (only when not already in glass), and
 `.never`. `GlassBackgroundEffect` includes `.automatic`, `.plate`, and `.feathered` configurations.
 
+`glassBackgroundEffect` is visionOS 1.0+; the custom-effect overload that takes a `GlassBackgroundEffect`
+is visionOS 2.4+. `backgroundExtensionEffect` and `UIBackgroundExtensionView` are also available on
+visionOS, unlike the rest of the glass family.
+
 ---
 
 ## UIKit and AppKit APIs
 
 Use native framework APIs when building UIKit or AppKit interfaces:
 
-- UIKit: `UIGlassEffect(style:)` is a `UIVisualEffect` with `isInteractive` and `tintColor`.
-- UIKit: `UIGlassContainerEffect` combines multiple glass elements.
+- UIKit: `UIGlassEffect(style:)` is a `UIVisualEffect` with `isInteractive` and `tintColor`; styles are
+  `UIGlassEffect.Style`. Put it in a `UIVisualEffectView`. iOS/iPadOS/Mac Catalyst/tvOS 26 only — not visionOS.
+- UIKit: `UIGlassContainerEffect` combines multiple glass elements; set its `spacing`, then nest
+  `UIVisualEffectView`s configured with `UIGlassEffect` in the container's `contentView`.
+- UIKit: `UIButton.Configuration.glass()`, `.prominentGlass()`, `.clearGlass()`, `.prominentClearGlass()`.
 - UIKit: `UIBackgroundExtensionView` extends content into its bounds;
   `UIScrollEdgeElementContainerInteraction` lets descendants shape scroll edge effects.
 - AppKit: `NSGlassEffectView` hosts content in glass (`contentView`, `cornerRadius`, `style`, `tintColor`,
   `effectIsInteractive`). Set its `contentView`; arbitrary subviews aren't guaranteed a specific z-order
-  around the effect.
+  around the effect. `effectIsInteractive` is macOS 27+ and meant for glass backing interactive controls or
+  containing them.
 - AppKit: `NSGlassEffectContainerView` merges similar descendant effects within `spacing` and can reduce
   rendering passes.
+- AppKit: `NSButton.BezelStyle.glass` gives an AppKit button the glass appearance.
 - AppKit: `NSBackgroundExtensionView` extends content to fill its bounds.
 
 ```swift

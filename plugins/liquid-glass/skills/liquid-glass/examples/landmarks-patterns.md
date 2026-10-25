@@ -7,12 +7,13 @@ Code patterns extracted from Apple's official Landmarks sample app demonstrating
 1. [App Architecture](#app-architecture)
 2. [Glass Badge Overlay with Morphing](#glass-badge-overlay-with-morphing)
 3. [Background Extension for Hero Images](#background-extension-for-hero-images)
-4. [Flexible Header with Parallax Scrolling](#flexible-header-with-parallax-scrolling)
-5. [Glass Toolbar Layout](#glass-toolbar-layout)
-6. [NavigationSplitView with Glass](#navigationsplitview-with-glass)
-7. [Platform-Specific Constants](#platform-specific-constants)
-8. [Collection Detail with Editing Mode](#collection-detail-with-editing-mode)
-9. [Inspector Panel Pattern](#inspector-panel-pattern)
+4. [Horizontal Scrolling Under a Sidebar or Inspector](#horizontal-scrolling-under-a-sidebar-or-inspector)
+5. [Flexible Header with Parallax Scrolling](#flexible-header-with-parallax-scrolling)
+6. [Glass Toolbar Layout](#glass-toolbar-layout)
+7. [NavigationSplitView with Glass](#navigationsplitview-with-glass)
+8. [Platform-Specific Constants](#platform-specific-constants)
+9. [Collection Detail with Editing Mode](#collection-detail-with-editing-mode)
+10. [Inspector Panel Pattern](#inspector-panel-pattern)
 
 ---
 
@@ -92,10 +93,10 @@ struct BadgesView: View {
 }
 ```
 
-**Overlay placement** via custom ViewModifier:
+**Overlay placement** via custom ViewModifier (`ShowBadgesViewModifier` in the sample):
 
 ```swift
-private struct ShowsBadgesViewModifier: ViewModifier {
+private struct ShowBadgesViewModifier: ViewModifier {
     func body(content: Content) -> some View {
         ZStack {
             content
@@ -112,13 +113,13 @@ private struct ShowsBadgesViewModifier: ViewModifier {
 }
 
 extension View {
-    func showsBadges() -> some View {
-        modifier(ShowsBadgesViewModifier())
+    func showBadges() -> some View {
+        modifier(ShowBadgesViewModifier())
     }
 }
 ```
 
-Usage: `.showsBadges()` on any view that should display the floating badge overlay.
+Usage: `.showBadges()` on any view that should display the floating badge overlay.
 
 ---
 
@@ -192,6 +193,36 @@ struct LandmarkDetailView: View {
         .toolbar(removing: .title)    // Clean glass toolbar
     }
 }
+```
+
+**Alignment rules the sample relies on:** neither the featured item nor its enclosing `LazyVStack`/`ScrollView`
+has padding, so the image reaches the leading edge next to the sidebar. In `LandmarkDetailView` the `ScrollView`
+and `VStack` have no padding either, so the image reaches the leading edge and the trailing edge of the
+container. Padding anywhere in that chain stops the effect from having safe-area space to mirror into.
+
+The sample applies `backgroundExtensionEffect()` to the image *before* the overlay, so the headline and button
+stay in place while only the image extends under the sidebar.
+
+---
+
+## Horizontal Scrolling Under a Sidebar or Inspector
+
+A horizontal scroll view that touches both edges is automatically adjusted to scroll under an open sidebar or
+inspector and then off-screen. Inset the content with a leading spacer instead of padding the scroll view:
+
+```swift
+ScrollView(.horizontal) {
+    HStack(spacing: 16.0) {
+        Spacer()
+            .frame(width: 26.0)   // matches the title padding
+
+        ForEach(landmarks) { landmark in
+            LandmarkView(landmark: landmark)
+        }
+    }
+}
+// No horizontal padding on the ScrollView: touching the edges is what
+// triggers the under-sidebar behavior.
 ```
 
 ---
@@ -315,7 +346,7 @@ struct LandmarksSplitView: View {
                 .navigationDestination(for: Landmark.self) { landmark in
                     LandmarkDetailView(landmark: landmark)
                 }
-                .showsBadges()  // Glass badge overlay
+                .showBadges()  // Glass badge overlay
             }
             .frame(minWidth: 150)
         } detail: {
@@ -325,7 +356,7 @@ struct LandmarksSplitView: View {
             .navigationDestination(for: Landmark.self) { landmark in
                 LandmarkDetailView(landmark: landmark)
             }
-            .showsBadges()  // Glass badge overlay
+            .showBadges()  // Glass badge overlay
         }
         .searchable(text: $modelData.searchString, prompt: "Search")
         .inspector(isPresented: $modelData.isLandmarkInspectorPresented) {
