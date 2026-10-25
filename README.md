@@ -19,7 +19,7 @@ The skill auto-activates when you discuss SwiftUI glass design, or invoke it man
 ### Step 1: Add the marketplace
 
 ```
-/plugin marketplace add haider-nawaz/liquid-glass-skill
+/plugin marketplace add romanbsd/liquid-glass-skill
 ```
 
 ### Step 2: Install the plugin

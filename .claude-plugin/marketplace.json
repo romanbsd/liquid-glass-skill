@@ -1,7 +1,7 @@
 {
   "name": "liquid-glass-skills",
   "owner": {
-    "name": "Haider"
+    "name": "Roman Shterenzon"
   },
   "metadata": {
     "description": "Claude Code skills for building Apple apps with Liquid Glass design (iOS 26+, macOS 26+)"
@@ -11,7 +11,7 @@
       "name": "liquid-glass",
       "source": "./plugins/liquid-glass",
       "description": "Build and migrate Apple platform apps with SwiftUI Liquid Glass design system. Covers glassEffect, backgroundExtensionEffect, GlassEffectContainer, glass toolbars, tab bars, sheets, and full migration workflows.",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "keywords": ["swiftui", "liquid-glass", "ios26", "macos26", "apple", "wwdc25"],
       "category": "apple-development"
     }
