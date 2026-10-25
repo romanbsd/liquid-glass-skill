@@ -1,6 +1,10 @@
 # Liquid Glass API Reference
 
-Complete API reference for all SwiftUI Liquid Glass modifiers and types. Always verify against the latest Apple documentation as APIs may change between betas.
+API reference for Liquid Glass across SwiftUI, UIKit, and AppKit. Verify platform availability against
+the active SDK. Apple references: [SwiftUI custom glass](https://developer.apple.com/documentation/SwiftUI/Applying-Liquid-Glass-to-custom-views),
+[UIKit appearance APIs](https://developer.apple.com/documentation/uikit/appearance-customization),
+[AppKit glass views](https://developer.apple.com/documentation/appkit/nsglasseffectview), and
+[SwiftUI updates](https://developer.apple.com/documentation/updates/swiftui).
 
 ## Table of Contents
 
@@ -9,13 +13,15 @@ Complete API reference for all SwiftUI Liquid Glass modifiers and types. Always 
 3. [GlassEffectContainer](#glasseffectcontainer)
 4. [glassEffectID](#glasseffectid)
 5. [glassEffectUnion](#glasseffectunion)
-6. [backgroundExtensionEffect](#backgroundextensioneffect)
-7. [Button Styles](#button-styles)
-8. [Toolbar Glass APIs](#toolbar-glass-apis)
-9. [TabView Glass APIs](#tabview-glass-apis)
-10. [Sheet Glass APIs](#sheet-glass-apis)
-11. [Accessibility APIs](#accessibility-apis)
-12. [UIKit Bridge](#uikit-bridge)
+6. [glassEffectTransition](#glasseffecttransition)
+7. [backgroundExtensionEffect and scroll edges](#backgroundextensioneffect-and-scroll-edges)
+8. [Button Styles](#button-styles)
+9. [Toolbar Glass APIs](#toolbar-glass-apis)
+10. [TabView Glass APIs](#tabview-glass-apis)
+11. [Sheet Glass APIs](#sheet-glass-apis)
+12. [visionOS Glass Background APIs](#visionos-glass-background-apis)
+13. [UIKit and AppKit APIs](#uikit-and-appkit-apis)
+14. [Accessibility APIs](#accessibility-apis)
 
 ---
 
@@ -24,17 +30,15 @@ Complete API reference for all SwiftUI Liquid Glass modifiers and types. Always 
 Applies the Liquid Glass material to a view.
 
 ```swift
-func glassEffect<S: Shape>(
+func glassEffect(
     _ glass: Glass = .regular,
-    in shape: S = DefaultGlassEffectShape,  // capsule by default
-    isEnabled: Bool = true
+    in shape: some Shape = DefaultGlassEffectShape()
 ) -> some View
 ```
 
 **Parameters:**
 - `glass`: The glass material style (`.regular`, `.clear`, `.identity`)
 - `shape`: The shape of the glass effect background
-- `isEnabled`: Whether the glass effect is active
 
 **Supported shapes:**
 - `.capsule` (default)
@@ -60,8 +64,11 @@ view.glassEffect(.regular, in: .circle)
 view.glassEffect(.regular, in: .rect(cornerRadius: .containerConcentric))
 
 // Conditionally enabled
-view.glassEffect(.regular, isEnabled: showGlass)
+view.glassEffect(showGlass ? .regular : .identity)
 ```
+
+The currently documented SwiftUI signature has no `isEnabled` parameter. Apply this modifier after
+other modifiers that affect appearance because SwiftUI captures the modified content.
 
 **Availability:** iOS 26.0+, macOS 26.0+, iPadOS 26.0+, watchOS 26.0+, tvOS 26.0+, visionOS 26.0+
 
@@ -83,10 +90,10 @@ The `Glass` struct defines the material appearance.
 
 ```swift
 // Add a tint color
-func tint(_ color: Color) -> Glass
+func tint(_ color: Color?) -> Glass
 
 // Enable interactive behavior (scaling, bouncing, shimmering on touch)
-func interactive() -> Glass
+func interactive(_ isEnabled: Bool = true) -> Glass
 ```
 
 **Method chaining:** Order-independent.
@@ -130,9 +137,8 @@ it "efficiently merges descendant glass effect views together when they are with
 to each other" and "improve[s] performance by reducing the number of passes required to render similar
 glass effect views." It is also the prerequisite for morphing.
 
-A container around a single glass element does nothing — use one when you have two or more nearby glass
-elements, or when you need `glassEffectID(_:in:)` or `glassEffectUnion(id:namespace:)`, both of which
-require a container.
+A container is intended for multiple glass effects that should blend or morph, and improves rendering
+performance. A single isolated glass view generally does not need one.
 
 ```swift
 struct GlassEffectContainer<Content: View>: View {
@@ -142,9 +148,11 @@ struct GlassEffectContainer<Content: View>: View {
 ```
 
 **Parameters:**
-- `spacing`: Controls morphing threshold. Elements within this distance visually blend during transitions.
+- `spacing`: Controls proximity for blending and morphing. If larger than the spacing in an interior
+  layout, shapes can blend while at rest.
 
-**Why required:** Each glass element creates a `CABackdropLayer` with 3 offscreen textures. Containers share sampling regions, reducing texture count and improving rendering performance.
+Use containers when applying effects to multiple views to improve rendering performance and enable
+shapes to blend and morph. Avoid relying on undocumented rendering implementation details.
 
 ```swift
 GlassEffectContainer(spacing: 30.0) {
@@ -162,8 +170,8 @@ GlassEffectContainer(spacing: 30.0) {
 Links glass elements for morphing transitions within a `GlassEffectContainer`.
 
 ```swift
-func glassEffectID<ID: Hashable>(
-    _ id: ID,
+func glassEffectID<ID: Hashable & Sendable>(
+    _ id: ID?,
     in namespace: Namespace.ID
 ) -> some View
 ```
@@ -200,23 +208,51 @@ GlassEffectContainer(spacing: 16) {
 Combines multiple glass effects into a single unified glass shape.
 
 ```swift
-func glassEffectUnion<ID: Hashable>(
-    _ id: ID,
-    in namespace: Namespace.ID
+func glassEffectUnion(
+    id: (some Hashable & Sendable)?,
+    namespace: Namespace.ID
 ) -> some View
 ```
 
-Use when multiple separate views should appear as one continuous glass surface.
+All effects in the union need the same shape and `Glass` variant to combine. Use an optional stable
+identifier scoped to a namespace.
 
 ---
 
-## backgroundExtensionEffect
+## glassEffectTransition
+
+Select how an effect enters or leaves the view hierarchy. Use with `glassEffect` and
+`GlassEffectContainer`.
+
+```swift
+func glassEffectTransition(_ transition: GlassEffectTransition) -> some View
+```
+
+- `.matchedGeometry` derives the appearing shape from nearby glass in the same container.
+- `.materialize` animates material and fades content without matching another shape; use when effects
+  are farther apart than the container spacing.
+- `.identity` applies no transition.
+
+```swift
+if isExpanded {
+    Image(systemName: "note")
+        .glassEffect()
+        .glassEffectID("note", in: namespace)
+        .glassEffectTransition(.materialize)
+}
+```
+
+These modifiers affect view hierarchy transitions/animations. `withAnimation` controls the state change.
+
+---
+
+## backgroundExtensionEffect and scroll edges
 
 Extends and blurs visual content beyond a view's bounds, creating continuous backgrounds behind navigation elements.
 
-```swift
-func backgroundExtensionEffect() -> some View
-```
+SwiftUI provides `backgroundExtensionEffect()` and `backgroundExtensionEffect(isEnabled: Bool)`. The
+effect mirrors and blurs view content into available safe areas around its bounds. UIKit provides
+`UIBackgroundExtensionView` for UIKit hierarchies.
 
 **Use cases:**
 - Hero images that extend behind toolbars/navigation bars
@@ -236,6 +272,21 @@ Image(imageName)
     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
     .backgroundExtensionEffect()
 ```
+
+### Scroll edge effects
+
+Scroll edge effects transition between scrolling content and stationary controls such as toolbars.
+SwiftUI chooses an automatic style by platform and context; customize it only when the default does not
+fit.
+
+```swift
+ScrollView { content }
+    .scrollEdgeEffectStyle(.soft, for: .top)
+    .scrollEdgeEffectHidden(true, for: .bottom)
+```
+
+Styles are `.automatic`, `.hard`, and `.soft`; pass `nil` to restore automatic behavior. UIKit provides
+`UIScrollEdgeElementContainerInteraction` for overlay descendants that should shape a scroll edge effect.
 
 **Best practices:**
 - Test legibility across different images, themes, and contexts
@@ -379,14 +430,59 @@ Button("Info", systemImage: "info") { showSheet = true }
 
 ---
 
+## visionOS Glass Background APIs
+
+`glassEffect` styles custom controls; visionOS also offers a depth-aware glass background for spatial
+views. The background affects z-axis layout. Apply it to an explicit `ZStack` when the glass should
+enclose a composed group, rather than an individual child.
+
+```swift
+view.glassBackgroundEffect(displayMode: .implicit)
+view.glassBackgroundEffect(in: .rect(cornerRadius: 24), displayMode: .always)
+view.glassBackgroundEffect(.feathered(padding: 12, softEdgeRadius: nil),
+                           in: .rect(cornerRadius: 24), displayMode: .always)
+```
+
+`GlassBackgroundDisplayMode` supports `.always`, `.implicit` (only when not already in glass), and
+`.never`. `GlassBackgroundEffect` includes `.automatic`, `.plate`, and `.feathered` configurations.
+
+---
+
+## UIKit and AppKit APIs
+
+Use native framework APIs when building UIKit or AppKit interfaces:
+
+- UIKit: `UIGlassEffect(style:)` is a `UIVisualEffect` with `isInteractive` and `tintColor`.
+- UIKit: `UIGlassContainerEffect` combines multiple glass elements.
+- UIKit: `UIBackgroundExtensionView` extends content into its bounds;
+  `UIScrollEdgeElementContainerInteraction` lets descendants shape scroll edge effects.
+- AppKit: `NSGlassEffectView` hosts content in glass (`contentView`, `cornerRadius`, `style`, `tintColor`,
+  `effectIsInteractive`). Set its `contentView`; arbitrary subviews aren't guaranteed a specific z-order
+  around the effect.
+- AppKit: `NSGlassEffectContainerView` merges similar descendant effects within `spacing` and can reduce
+  rendering passes.
+- AppKit: `NSBackgroundExtensionView` extends content to fill its bounds.
+
+```swift
+let effect = UIGlassEffect(style: .regular)
+effect.isInteractive = true
+effect.tintColor = .systemBlue
+let effectView = UIVisualEffectView(effect: effect)
+```
+
+Prefer SwiftUI's `.glassEffect` for SwiftUI interfaces. Bridge only when integrating native hierarchies or
+using capabilities SwiftUI doesn't expose directly.
+
+---
+
 ## Accessibility APIs
 
-Liquid Glass automatically adapts for accessibility settings. No code changes required for:
+Liquid Glass adapts to accessibility and appearance settings. Validate actual screens with:
 
 - **Reduced Transparency:** Increases frosting for clarity
 - **Increased Contrast:** Applies stark colors and borders
 - **Reduced Motion:** Tones down animations/elastic effects
-- **Tinted Mode (iOS 26.1+):** User-controlled opacity increase
+- **Preferred Liquid Glass appearance:** User-selected appearance can affect regular and clear variants
 
 ### Manual Override (when needed)
 
@@ -400,27 +496,3 @@ var body: some View {
 ```
 
 ---
-
-## UIKit Bridge
-
-For cases where SwiftUI glass has rendering issues (e.g., rotation animations):
-
-```swift
-// UIKit glass effect
-let glassEffect = UIGlassEffect()
-let effectView = UIVisualEffectView(effect: glassEffect)
-
-// In UIViewRepresentable
-struct GlassView: UIViewRepresentable {
-    func makeUIView(context: Context) -> UIVisualEffectView {
-        let effect = UIGlassEffect()
-        return UIVisualEffectView(effect: effect)
-    }
-    func updateUIView(_ uiView: UIVisualEffectView, context: Context) { }
-}
-```
-
-Use this bridge when:
-- `rotationEffect` causes glass shape morphing artifacts
-- You need precise control over glass rendering in complex layouts
-- Integrating glass into existing UIKit view hierarchies

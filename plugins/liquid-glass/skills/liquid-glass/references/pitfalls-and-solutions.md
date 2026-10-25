@@ -109,14 +109,16 @@ Image(imageName)
 
 **Problem:** When applying `rotationEffect(_:anchor:)` to views with glass effects, the glass shape morphs unpredictably during animation instead of rotating smoothly.
 
-**Solution:** Bridge to UIKit using `UIViewRepresentable` with `UIGlassEffect`:
+**Guidance:** This behavior can vary by OS and composition. First validate the effect in the target OS and
+consider changing the view hierarchy or animation. If UIKit integration is otherwise appropriate, the
+UIKit glass effect requires a style:
 
 ```swift
 struct RotatableGlassView: UIViewRepresentable {
     let rotation: Angle
 
     func makeUIView(context: Context) -> UIVisualEffectView {
-        let effect = UIGlassEffect()
+        let effect = UIGlassEffect(style: .regular)
         let view = UIVisualEffectView(effect: effect)
         return view
     }

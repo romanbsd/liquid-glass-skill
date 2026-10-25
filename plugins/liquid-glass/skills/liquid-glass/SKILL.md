@@ -9,18 +9,20 @@ Build and migrate SwiftUI apps using Apple's Liquid Glass design language introd
 
 ## Important: Use Latest Documentation
 
-Always fetch the latest Apple developer documentation when implementing Liquid Glass features. The APIs may evolve between OS betas. Key documentation URLs to reference:
+Always check current Apple documentation and the SDK/compiler used by the project before implementing. Availability and details can vary by platform and SDK. Key references:
 
-- `https://developer.apple.com/documentation/SwiftUI/Applying-Liquid-Glass-to-custom-views`
-- `https://developer.apple.com/documentation/swiftui/view/glasseffect(_:in:)`
-- `https://developer.apple.com/documentation/SwiftUI/Landmarks-Building-an-app-with-Liquid-Glass`
+- [Adopting Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass)
+- [Materials HIG](https://developer.apple.com/design/human-interface-guidelines/materials)
+- [Applying Liquid Glass to custom views](https://developer.apple.com/documentation/SwiftUI/Applying-Liquid-Glass-to-custom-views)
+- [`glassEffect(_:in:)`](https://developer.apple.com/documentation/swiftui/view/glasseffect%28_%3Ain%3A%29)
+- [Landmarks: Building an app with Liquid Glass](https://developer.apple.com/documentation/SwiftUI/Landmarks-Building-an-app-with-Liquid-Glass)
 - `https://developer.apple.com/videos/play/wwdc2025/323/` (WWDC25 Session: Build a SwiftUI app with the new design)
 
 ## Core Concept
 
-Liquid Glass is a translucent, dynamic material exclusively for the **navigation layer** (toolbars, tab bars, buttons, controls) that floats above app content. It bends and refracts light in real-time, responds to device motion with specular highlights, and adapts continuously to background content.
+Liquid Glass is a dynamic material for the **functional layer** (navigation and controls) that floats above app content. System components adopt it automatically. Prefer those components; add custom glass sparingly to important controls. Standard materials remain appropriate for backgrounds and structure in the content layer. Liquid Glass is not exclusive to navigation: transient controls embedded in content can use it to emphasize interactivity.
 
-**Never apply glass to content itself** (lists, tables, media, text blocks). Glass is for controls and navigation only.
+Avoid applying Liquid Glass to content itself (lists, tables, media, text blocks). Use standard materials for content surfaces. Use `.clear` only over visually rich media; consider a 35% dark dimming layer when the media is bright. Keep foreground labels legible and use semantic/vibrant foreground colors.
 
 ## Quick Start: Key APIs
 
@@ -65,8 +67,9 @@ A container merges nearby glass elements and batches their rendering. AppKit doc
 when they are within a specified proximity to each other," with a performance tip about "reducing the
 number of passes required to render similar glass effect views." It is also what makes morphing work.
 
-Group nearby glass elements in one container. A container around a **single** glass element is a no-op —
-skip it unless you are using `glassEffectID(_:in:)` or `glassEffectUnion(id:namespace:)`, which require one.
+Use `GlassEffectContainer` for multiple effects that should blend or morph, and when coordinating them
+with `glassEffectID`, `glassEffectUnion`, or `glassEffectTransition`. Avoid excessive containers or
+onscreen effects; profile complex interfaces.
 
 ```swift
 GlassEffectContainer(spacing: 30.0) {
@@ -178,7 +181,7 @@ For detailed migration steps, see [references/migration-guide.md](references/mig
 
 **Summary:**
 1. Compile with Xcode 26 SDK - system components auto-adopt glass
-2. Remove custom toolbar backgrounds (`.toolbarBackground`)
+2. Remove custom toolbar backgrounds (`.toolbarBackground`) where they conflict with system glass
 3. Replace custom materials on navigation elements with glass modifiers
 4. Wrap grouped glass elements in `GlassEffectContainer`
 5. Add `.backgroundExtensionEffect()` to hero images
@@ -194,6 +197,8 @@ For platform-specific details, see [references/platform-specifics.md](references
 - **iOS (iPhone)**: `.interactive()` works; use `UIDevice.current.userInterfaceIdiom` for layout
 - **iPadOS**: Larger grid sizes; sidebar adaptable tab views
 - **Conditional compilation**: Use `#if os(macOS)` / `#if os(iOS)` for platform-specific code
+- **UIKit / AppKit**: Native glass APIs exist (`UIGlassEffect`, `UIGlassContainerEffect`, `NSGlassEffectView`, and containers) when the interface isn't SwiftUI
+- **visionOS**: `glassBackgroundEffect` provides a depth-aware spatial background, distinct from control-oriented `.glassEffect`
 
 ## Common Pitfalls
 
@@ -201,7 +206,7 @@ For detailed pitfalls and solutions, see [references/pitfalls-and-solutions.md](
 
 **Critical issues:**
 - Glass elements outside `GlassEffectContainer` produce inconsistent visuals
-- `rotationEffect` on glass views causes shape morphing - bridge to UIKit with `UIGlassEffect`
+- `rotationEffect` on glass views can cause shape morphing artifacts - validate on target OS versions before choosing a UIKit workaround
 - Menu labels with glass cause animation artifacts - use custom `ButtonStyle`
 - Hit-testing only registers on content, not glass area - use `contentShape()` to fix
 - Multiple glass effects = multiple `CABackdropLayer` instances (3 offscreen textures each) - use containers to group
@@ -222,3 +227,5 @@ For complete code patterns from Apple's Landmarks sample app, see [examples/land
 8. Prefer symbol-based buttons with text labels in toolbars
 9. Use `.symbolVariant()` modifier for SF Symbol state changes
 10. Use `.symbolEffect(.drawOn)` for animated icon transitions
+11. Use `glassEffectTransition(.matchedGeometry)` or `.materialize` to select how custom glass enters/leaves a hierarchy
+12. Tune scroll/content boundaries with `scrollEdgeEffectStyle(_:for:)` and `scrollEdgeEffectHidden(_:for:)` when automatic behavior does not fit
